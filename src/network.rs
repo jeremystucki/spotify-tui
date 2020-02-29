@@ -40,6 +40,7 @@ pub enum IoEvent {
     GetPlaylistTracks(String, u32),
     GetCurrentSavedTracks(Option<u32>, bool),
     StartPlayback(Option<String>, Option<Vec<String>>, Option<usize>),
+    UpdateSearchLimits(u32, u32),
 }
 
 pub fn get_spotify(token_info: TokenInfo) -> (Spotify, Instant) {
@@ -63,7 +64,6 @@ pub struct Network {
     oauth: SpotifyOAuth,
     spotify: Spotify,
     spotify_token_expiry: Instant,
-    // TODO: This needs to be updated from the main thread
     large_search_limit: u32,
     small_search_limit: u32,
     client_config: ClientConfig,
@@ -147,6 +147,10 @@ impl Network {
             }
             IoEvent::StartPlayback(context_uri, uris, offset) => {
                 self.start_playback(&app, context_uri, uris, offset).await;
+            }
+            IoEvent::UpdateSearchLimits(large_search_limit, small_search_limit) => {
+                self.large_search_limit = large_search_limit;
+                self.small_search_limit = small_search_limit;
             }
         };
     }

@@ -202,6 +202,7 @@ async fn main() -> Result<(), failure::Error> {
             let app = Arc::new(Mutex::new(App::new(
                 sync_io_tx,
                 user_config,
+                // TODO: remove client config from app and keep only in network
                 client_config.clone(),
             )));
             let (spotify, token_expiry) = get_spotify(token_info);
@@ -227,27 +228,33 @@ async fn main() -> Result<(), failure::Error> {
                 // Get the size of the screen on each loop to account for resize event
                 if let Ok(size) = terminal.backend().size() {
                     // Reset the help menu is the terminal was resized
-                    if app.size != size {
+                    if is_first_render || app.size != size {
                         app.help_menu_max_lines = 0;
                         app.help_menu_offset = 0;
                         app.help_menu_page = 0;
-                    }
 
-                    app.size = size;
+                        app.size = size;
 
-                    // Based on the size of the terminal, adjust the search limit.
-                    let potential_limit = max((app.size.height as i32) - 13, 0) as u32;
-                    let max_limit = min(potential_limit, 50);
-                    app.large_search_limit = min((f32::from(size.height) / 1.4) as u32, max_limit);
-                    app.small_search_limit =
-                        min((f32::from(size.height) / 2.85) as u32, max_limit / 2);
+                        // Based on the size of the terminal, adjust the search limit.
+                        let potential_limit = max((app.size.height as i32) - 13, 0) as u32;
+                        let max_limit = min(potential_limit, 50);
+                        let large_search_limit =
+                            min((f32::from(size.height) / 1.4) as u32, max_limit);
+                        let small_search_limit =
+                            min((f32::from(size.height) / 2.85) as u32, max_limit / 2);
 
-                    // Based on the size of the terminal, adjust how many lines are
-                    // dislayed in the help menu
-                    if app.size.height > 8 {
-                        app.help_menu_max_lines = (app.size.height as u32) - 8;
-                    } else {
-                        app.help_menu_max_lines = 0;
+                        app.dispatch(IoEvent::UpdateSearchLimits(
+                            large_search_limit,
+                            small_search_limit,
+                        ));
+
+                        // Based on the size of the terminal, adjust how many lines are
+                        // dislayed in the help menu
+                        if app.size.height > 8 {
+                            app.help_menu_max_lines = (app.size.height as u32) - 8;
+                        } else {
+                            app.help_menu_max_lines = 0;
+                        }
                     }
                 };
 
@@ -271,15 +278,9 @@ async fn main() -> Result<(), failure::Error> {
                 })?;
 
                 if current_route.active_block == ActiveBlock::Input {
-                    match terminal.show_cursor() {
-                        Ok(_r) => {}
-                        Err(_e) => {}
-                    };
+                    terminal.show_cursor()?;
                 } else {
-                    match terminal.hide_cursor() {
-                        Ok(_r) => {}
-                        Err(_e) => {}
-                    };
+                    terminal.hide_cursor()?;
                 }
 
                 let cursor_offset = if app.size.height > ui::util::SMALL_TERMINAL_HEIGHT {
@@ -294,6 +295,7 @@ async fn main() -> Result<(), failure::Error> {
                     cursor_offset,
                 ))?;
 
+                // Handle authentication refresh
                 if Instant::now() > token_expiry {
                     app.dispatch(IoEvent::RefreshAuthentication);
                 }
