@@ -60,6 +60,7 @@ pub fn get_spotify(token_info: TokenInfo) -> (Spotify, Instant) {
     (spotify, token_expiry)
 }
 
+#[derive(Debug, Clone)]
 pub struct Network {
     oauth: SpotifyOAuth,
     spotify: Spotify,

@@ -209,14 +209,8 @@ async fn main() -> Result<(), failure::Error> {
 
             let cloned_app = Arc::clone(&app);
             std::thread::spawn(move || {
-                start_tokio(
-                    sync_io_rx,
-                    oauth,
-                    spotify,
-                    token_expiry,
-                    &app,
-                    client_config,
-                );
+                let network = Network::new(oauth, spotify, token_expiry, client_config);
+                start_tokio(sync_io_rx, &app, network);
             });
 
             // play music on, if not send them to the device selection view
@@ -362,17 +356,15 @@ async fn main() -> Result<(), failure::Error> {
 #[tokio::main]
 async fn start_tokio<'a>(
     io_rx: std::sync::mpsc::Receiver<IoEvent>,
-    oauth: SpotifyOAuth,
-    spotify: Spotify,
-    token_expiry: Instant,
     app: &Arc<Mutex<App>>,
-    client_config: ClientConfig,
+    network: Network,
 ) {
-    let mut network = Network::new(oauth, spotify, token_expiry, client_config);
     let io_rx = io_rx;
     while let Ok(io_event) = io_rx.recv() {
-        // tokio::spawn(async move {
-        network.handle_network_event(io_event, app).await;
-        // });
+        let app = Arc::clone(app);
+        let mut network = network.clone();
+        tokio::spawn(async move {
+            network.handle_network_event(io_event, &app).await;
+        });
     }
 }
