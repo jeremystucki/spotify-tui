@@ -154,6 +154,9 @@ impl Network {
                 self.small_search_limit = small_search_limit;
             }
         };
+
+        let mut app = app.lock().await;
+        app.is_loading = false;
     }
 
     pub async fn get_user(&self, app: &AppArc) {

@@ -285,6 +285,7 @@ pub struct App {
     pub help_menu_page: u32,
     pub help_menu_max_lines: u32,
     pub help_menu_offset: u32,
+    pub is_loading: bool,
     io_tx: Sender<IoEvent>,
 }
 
@@ -359,12 +360,16 @@ impl App {
             help_menu_page: 0,
             help_menu_max_lines: 0,
             help_menu_offset: 0,
+            is_loading: false,
             io_tx,
         }
     }
 
+    // Send a network event to the network thread
     pub fn dispatch(&mut self, action: IoEvent) {
+        self.is_loading = true;
         if let Err(e) = self.io_tx.send(action) {
+            self.is_loading = false;
             println!("Error from dispatch {}", e);
             // TODO: handle error
         };

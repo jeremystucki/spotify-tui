@@ -134,15 +134,21 @@ where
         )
         .render(f, chunks[0]);
 
+    let help_block_text = if app.is_loading {
+        (app.user_config.theme.hint, "Loading...")
+    } else {
+        (app.user_config.theme.inactive, "Type ?")
+    };
+
     let block = Block::default()
         .title("Help")
         .borders(Borders::ALL)
-        .border_style(Style::default().fg(app.user_config.theme.inactive))
-        .title_style(Style::default().fg(app.user_config.theme.inactive));
+        .border_style(Style::default().fg(help_block_text.0))
+        .title_style(Style::default().fg(help_block_text.0));
 
-    Paragraph::new([Text::raw("Type ?")].iter())
+    Paragraph::new([Text::raw(help_block_text.1)].iter())
         .block(block)
-        .style(Style::default().fg(app.user_config.theme.inactive))
+        .style(Style::default().fg(help_block_text.0))
         .render(f, chunks[1]);
 }
 
