@@ -7,7 +7,7 @@ use super::{
 use crate::event::Key;
 use crate::network::IoEvent;
 
-async fn handle_down_press_on_selected_block(app: &mut App) {
+fn handle_down_press_on_selected_block(app: &mut App) {
     // Start selecting within the selected block
     match app.search_results.selected_block {
         SearchResultBlock::AlbumSearch => {
@@ -220,7 +220,7 @@ fn handle_low_press_on_selected_block(app: &mut App) {
     }
 }
 
-async fn handle_enter_event_on_selected_block(app: &mut App) {
+fn handle_enter_event_on_selected_block(app: &mut App) {
     match &app.search_results.selected_block {
         SearchResultBlock::AlbumSearch => {
             if let (Some(index), Some(albums_result)) = (
@@ -229,7 +229,7 @@ async fn handle_enter_event_on_selected_block(app: &mut App) {
             ) {
                 if let Some(album) = albums_result.albums.items.get(index.to_owned()).cloned() {
                     app.track_table.context = Some(TrackTableContext::AlbumSearch);
-                    app.get_album_tracks(album).await;
+                    app.dispatch(IoEvent::GetAlbumTracks(album));
                 };
             }
         }
@@ -250,7 +250,7 @@ async fn handle_enter_event_on_selected_block(app: &mut App) {
             if let Some(index) = &app.search_results.selected_artists_index {
                 if let Some(result) = app.search_results.artists.clone() {
                     if let Some(artist) = result.artists.items.get(index.to_owned()) {
-                        app.get_artist(&artist.id, &artist.name).await;
+                        app.get_artist(artist.id.clone(), artist.name.clone());
                         app.push_navigation_stack(RouteId::Artist, ActiveBlock::ArtistBlock);
                     };
                 };
@@ -315,7 +315,7 @@ fn handle_enter_event_on_hovered_block(app: &mut App) {
     };
 }
 
-async fn handle_recommended_tracks(app: &mut App) {
+fn handle_recommended_tracks(app: &mut App) {
     match app.search_results.selected_block {
         SearchResultBlock::AlbumSearch => {}
         SearchResultBlock::SongSearch => {
@@ -328,8 +328,7 @@ async fn handle_recommended_tracks(app: &mut App) {
                         };
                         app.recommendations_context = Some(RecommendationsContext::Song);
                         app.recommendations_seed = track.name.clone();
-                        app.get_recommendations_for_seed(None, track_id_list, Some(track))
-                            .await;
+                        app.get_recommendations_for_seed(None, track_id_list, Some(track.clone()));
                     };
                 };
             };
@@ -341,8 +340,7 @@ async fn handle_recommended_tracks(app: &mut App) {
                         let artist_id_list: Option<Vec<String>> = Some(vec![artist.id.clone()]);
                         app.recommendations_context = Some(RecommendationsContext::Artist);
                         app.recommendations_seed = artist.name.clone();
-                        app.get_recommendations_for_seed(artist_id_list, None, None)
-                            .await;
+                        app.get_recommendations_for_seed(artist_id_list, None, None);
                     };
                 };
             };
@@ -352,14 +350,14 @@ async fn handle_recommended_tracks(app: &mut App) {
     }
 }
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         Key::Esc => {
             app.search_results.selected_block = SearchResultBlock::Empty;
         }
         k if common_key_events::down_event(k) => {
             if app.search_results.selected_block != SearchResultBlock::Empty {
-                handle_down_press_on_selected_block(app).await;
+                handle_down_press_on_selected_block(app);
             } else {
                 handle_down_press_on_hovered_block(app);
             }
@@ -427,30 +425,20 @@ pub async fn handler(key: Key, app: &mut App) {
             SearchResultBlock::Empty => handle_enter_event_on_hovered_block(app),
             SearchResultBlock::PlaylistSearch => {
                 app.playlist_offset = 0;
-                handle_enter_event_on_selected_block(app).await;
+                handle_enter_event_on_selected_block(app);
             }
-            _ => handle_enter_event_on_selected_block(app).await,
+            _ => handle_enter_event_on_selected_block(app),
         },
         Key::Char('w') => match app.search_results.selected_block {
-            SearchResultBlock::AlbumSearch => app.current_user_saved_album_add().await,
+            SearchResultBlock::AlbumSearch => app.current_user_saved_album_add(),
             SearchResultBlock::SongSearch => {}
-            SearchResultBlock::ArtistSearch => app.user_follow_artists().await,
+            SearchResultBlock::ArtistSearch => app.user_follow_artists(),
             SearchResultBlock::PlaylistSearch => {
-                app.user_follow_playlists().await;
-                if let Some(spotify) = &app.spotify {
-                    let playlists = spotify
-                        .current_user_playlists(app.large_search_limit, None)
-                        .await;
-
-                    match playlists {
-                        Ok(p) => app.playlists = Some(p),
-                        Err(e) => app.handle_error(e),
-                    }
-                }
+                app.user_follow_playlist();
             }
             SearchResultBlock::Empty => {}
         },
-        Key::Char('r') => handle_recommended_tracks(app).await,
+        Key::Char('r') => handle_recommended_tracks(app),
         // Add `s` to "see more" on each option
         _ => {}
     }

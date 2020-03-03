@@ -5,7 +5,7 @@ use crate::{
     network::IoEvent,
 };
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         k if common_key_events::left_event(k) => common_key_events::handle_left_event(app),
         k if common_key_events::down_event(k) => {
@@ -47,10 +47,10 @@ pub async fn handler(key: Key, app: &mut App) {
         Key::Enter => {
             let artists = app.artists.to_owned();
             let artist = &artists[app.artists_list_index];
-            app.get_artist(&artist.id, &artist.name).await;
+            app.get_artist(artist.id.clone(), artist.name.clone());
             app.push_navigation_stack(RouteId::Artist, ActiveBlock::ArtistBlock);
         }
-        Key::Char('D') => app.user_unfollow_artists().await,
+        Key::Char('D') => app.user_unfollow_artists(),
         Key::Char('e') => {
             let artists = app.artists.to_owned();
             let artist = artists.get(app.artists_list_index);
@@ -71,8 +71,7 @@ pub async fn handler(key: Key, app: &mut App) {
 
                 app.recommendations_context = Some(RecommendationsContext::Artist);
                 app.recommendations_seed = artist_name;
-                app.get_recommendations_for_seed(artist_id_list, None, None)
-                    .await;
+                app.get_recommendations_for_seed(artist_id_list, None, None);
             }
         }
         _ => {}

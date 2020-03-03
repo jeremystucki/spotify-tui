@@ -806,7 +806,7 @@ where
         .margin(5)
         .split(f.size());
 
-    let mut playing_text = vec![
+    let playing_text = vec![
         Text::raw("Api response: "),
         Text::styled(&app.api_error, Style::default().fg(app.user_config.theme.error_text)),
         Text::styled(
@@ -828,13 +828,6 @@ Hint: a playback device must be either an official spotify client or a light wei
             Style::default().fg(app.user_config.theme.inactive),
         ),
     ];
-
-    if app.client_config.device_id.is_none() {
-        playing_text.push(Text::styled(
-            "\nNo playback device is selected - follow point 2 above",
-            Style::default().fg(app.user_config.theme.hint),
-        ))
-    }
 
     Paragraph::new(playing_text.iter())
         .wrap(true)

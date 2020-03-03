@@ -17,7 +17,6 @@ use rspotify::{
     },
     senum::Country,
 };
-use serde_json::{map::Map, Value};
 use std::str::FromStr;
 use std::sync::mpsc::Sender;
 use std::{
@@ -47,7 +46,7 @@ const DEFAULT_ROUTE: Route = Route {
 #[derive(Clone)]
 pub struct ScrollableResultPages<T> {
     index: usize,
-    pages: Vec<T>,
+    pub pages: Vec<T>,
 }
 
 impl<T> ScrollableResultPages<T> {
@@ -437,7 +436,6 @@ impl App {
         if let Some(user) = &self.user.to_owned() {
             let user_country =
                 Country::from_str(&user.country.to_owned().unwrap_or_else(|| "".to_string())).ok();
-            let empty_payload: Map<String, Value> = Map::new();
 
             self.dispatch(IoEvent::GetRecommendationsForSeed(
                 seed_artists,
@@ -445,6 +443,15 @@ impl App {
                 first_track,
                 user_country,
             ));
+        }
+    }
+
+    pub fn get_recommendations_for_track_id(&mut self, id: String) {
+        if let Some(user) = &self.user.to_owned() {
+            let user_country =
+                Country::from_str(&user.country.to_owned().unwrap_or_else(|| "".to_string())).ok();
+
+            self.dispatch(IoEvent::GetRecommendationsForTrackId(id, user_country));
         }
     }
 
@@ -629,13 +636,13 @@ impl App {
         }
     }
 
-    pub fn shuffle(&self) {
-        if let Some(context) = &self.current_playback_context {
+    pub fn shuffle(&mut self) {
+        if let Some(context) = &self.current_playback_context.clone() {
             self.dispatch(IoEvent::Shuffle(context.shuffle_state));
         };
     }
 
-    pub async fn get_current_user_saved_albums_next(&mut self) {
+    pub fn get_current_user_saved_albums_next(&mut self) {
         match self
             .library
             .saved_albums
@@ -661,7 +668,7 @@ impl App {
     pub fn current_user_saved_album_delete(&mut self) {
         if let Some(albums) = self.library.saved_albums.get_results(None) {
             if let Some(selected_album) = albums.items.get(self.album_list_index) {
-                let album_id = selected_album.album.id;
+                let album_id = selected_album.album.id.clone();
                 self.dispatch(IoEvent::CurrentUserSavedAlbumDelete(album_id));
             }
         }
@@ -671,76 +678,61 @@ impl App {
         if let Some(albums) = &self.search_results.albums {
             if let Some(selected_index) = self.search_results.selected_album_index {
                 let selected_album = &albums.albums.items[selected_index];
-                if let Some(album_id) = selected_album.id {
+                if let Some(album_id) = selected_album.id.clone() {
                     self.dispatch(IoEvent::CurrentUserSavedAlbumAdd(album_id));
                 }
             }
         }
     }
 
-    pub async fn user_unfollow_artists(&mut self) {
+    pub fn user_unfollow_artists(&mut self) {
         if let Some(artists) = self.library.saved_artists.get_results(None) {
             if let Some(selected_artist) = artists.items.get(self.artists_list_index) {
-                if let Some(spotify) = &mut self.spotify {
-                    let artist_id = &selected_artist.id;
-                    match spotify.user_unfollow_artists(&[artist_id.to_owned()]).await {
-                        Ok(_) => self.get_artists(None).await,
-                        Err(e) => self.handle_error(e),
-                    }
-                }
+                let artist_id = selected_artist.id.clone();
+                self.dispatch(IoEvent::UserUnfollowArtists(vec![artist_id]));
             }
         }
     }
 
-    pub async fn user_follow_artists(&mut self) {
+    pub fn user_follow_artists(&mut self) {
         if let Some(artists) = &self.search_results.artists {
             if let Some(selected_index) = self.search_results.selected_artists_index {
-                if let Some(spotify) = &mut self.spotify {
-                    let selected_artist: &FullArtist = &artists.artists.items[selected_index];
-                    let artist_id = &selected_artist.id;
-                    if let Err(e) = spotify.user_follow_artists(&[artist_id.to_owned()]).await {
-                        self.handle_error(e);
-                    }
-                }
+                let selected_artist: &FullArtist = &artists.artists.items[selected_index];
+                let artist_id = selected_artist.id.clone();
+                self.dispatch(IoEvent::UserFollowArtists(vec![artist_id]));
             }
         }
     }
 
-    pub async fn user_follow_playlists(&mut self) {
-        if let (Some(playlists), Some(selected_index), Some(spotify)) = (
+    pub fn user_follow_playlist(&mut self) {
+        if let (Some(playlists), Some(selected_index)) = (
             &self.search_results.playlists,
             self.search_results.selected_playlists_index,
-            &self.spotify,
         ) {
             let selected_playlist: &SimplifiedPlaylist = &playlists.playlists.items[selected_index];
-            let selected_id = &selected_playlist.id;
+            let selected_id = selected_playlist.id.clone();
             let selected_public = selected_playlist.public;
-            let selected_owner_id = &selected_playlist.owner.id;
-            if let Err(e) = spotify
-                .user_playlist_follow_playlist(&selected_owner_id, &selected_id, selected_public)
-                .await
-            {
-                self.handle_error(e);
-            }
+            let selected_owner_id = selected_playlist.owner.id.clone();
+            self.dispatch(IoEvent::UserFollowPlaylist(
+                selected_owner_id,
+                selected_id,
+                selected_public,
+            ));
         }
     }
 
-    pub async fn user_unfollow_playlists(&mut self) {
-        if let (Some(playlists), Some(selected_index), Some(user), Some(spotify)) = (
-            &self.playlists,
-            self.selected_playlist_index,
-            &self.user,
-            &self.spotify,
-        ) {
+    pub fn user_unfollow_playlist(&mut self) {
+        if let (Some(playlists), Some(selected_index), Some(user)) =
+            (&self.playlists, self.selected_playlist_index, &self.user)
+        {
             let selected_playlist = &playlists.items[selected_index];
-            let selected_id = &selected_playlist.id;
-            if let Err(e) = spotify.user_playlist_unfollow(&user.id, &selected_id).await {
-                self.handle_error(e);
-            }
+            let selected_id = selected_playlist.id.clone();
+            let user_id = user.id.clone();
+            self.dispatch(IoEvent::UserUnfollowPlaylist(user_id, selected_id))
         }
     }
 
-    pub async fn get_made_for_you(&mut self) {
+    pub fn get_made_for_you(&mut self) {
         // TODO: replace searches when relevant endpoint is added
         const DISCOVER_WEEKLY: &str = "Discover Weekly";
         const RELEASE_RADAR: &str = "Release Radar";
@@ -750,70 +742,49 @@ impl App {
         if self.library.made_for_you_playlists.pages.is_empty() {
             // We shouldn't be fetching all the results immediately - only load the data when the
             // user selects the playlist
-            self.made_for_you_search_and_add(DISCOVER_WEEKLY).await;
-            self.made_for_you_search_and_add(RELEASE_RADAR).await;
-            self.made_for_you_search_and_add(ON_REPEAT).await;
-            self.made_for_you_search_and_add(REPEAT_REWIND).await;
+            self.made_for_you_search_and_add(DISCOVER_WEEKLY);
+            self.made_for_you_search_and_add(RELEASE_RADAR);
+            self.made_for_you_search_and_add(ON_REPEAT);
+            self.made_for_you_search_and_add(REPEAT_REWIND);
         }
     }
 
-    async fn made_for_you_search_and_add(&mut self, search_string: &str) {
-        const SPOTIFY_ID: &str = "spotify";
-
-        if let (Some(spotify), Some(user)) = (self.spotify.clone(), self.user.clone()) {
+    fn made_for_you_search_and_add(&mut self, search_string: &str) {
+        if let Some(user) = self.user.clone() {
             let user_country =
                 Country::from_str(&user.country.unwrap_or_else(|| "".to_string())).ok();
-            match spotify
-                .search_playlist(search_string, self.large_search_limit, 0, user_country)
-                .await
-            {
-                Ok(mut search_playlists) => {
-                    let mut filtered_playlists = search_playlists
-                        .playlists
-                        .items
-                        .iter()
-                        .filter(|playlist| {
-                            playlist.owner.id == SPOTIFY_ID && playlist.name == search_string
-                        })
-                        .map(|playlist| playlist.to_owned())
-                        .collect::<Vec<SimplifiedPlaylist>>();
+            self.dispatch(IoEvent::MadeForYouSearchAndAdd(
+                search_string.to_string(),
+                user_country,
+            ));
+        }
+    }
 
-                    if !self.library.made_for_you_playlists.pages.is_empty() {
-                        self.library
-                            .made_for_you_playlists
-                            .get_mut_results(None)
-                            .unwrap()
-                            .items
-                            .append(&mut filtered_playlists);
-                    } else {
-                        search_playlists.playlists.items = filtered_playlists;
-                        self.library
-                            .made_for_you_playlists
-                            .add_pages(search_playlists.playlists);
-                    }
-                }
-                Err(e) => {
-                    self.handle_error(e);
-                }
+    pub fn get_audio_analysis(&mut self) {
+        if let Some(context) = &self.current_playback_context {
+            if let Some(track) = &context.item {
+                let uri = track.uri.clone();
+
+                self.dispatch(IoEvent::GetAudioAnalysis(uri));
             }
         }
     }
 
-    pub async fn get_audio_analysis(&mut self) {
-        if let (Some(spotify), Some(context)) = (&self.spotify, &self.current_playback_context) {
-            if let Some(track) = &context.item {
-                let uri = &track.uri;
+    pub fn repeat(&mut self) {
+        if let Some(context) = &self.current_playback_context.clone() {
+            self.dispatch(IoEvent::Repeat(context.repeat_state));
+        }
+    }
 
-                match spotify.audio_analysis(uri).await {
-                    Ok(result) => {
-                        self.audio_analysis = Some(result);
-                        self.push_navigation_stack(RouteId::Analysis, ActiveBlock::Analysis);
-                    }
-                    Err(e) => {
-                        self.handle_error(e);
-                    }
-                }
-            }
+    pub fn get_artist(&mut self, artist_id: String, input_artist_name: String) {
+        if let Some(user) = &self.user.to_owned() {
+            let user_country =
+                Country::from_str(&user.country.to_owned().unwrap_or_else(|| "".to_string())).ok();
+            self.dispatch(IoEvent::GetArtist(
+                artist_id,
+                input_artist_name,
+                user_country,
+            ));
         }
     }
 

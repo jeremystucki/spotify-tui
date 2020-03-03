@@ -5,7 +5,7 @@ use crate::{
     network::IoEvent,
 };
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         k if common_key_events::left_event(k) => common_key_events::handle_left_event(app),
         k if common_key_events::down_event(k) => match app.album_table_context {
@@ -51,7 +51,7 @@ pub async fn handler(key: Key, app: &mut App) {
         k if common_key_events::high_event(k) => handle_high_event(app),
         k if common_key_events::middle_event(k) => handle_middle_event(app),
         k if common_key_events::low_event(k) => handle_low_event(app),
-        Key::Char('s') => handle_save_event(app).await,
+        Key::Char('s') => handle_save_event(app),
         Key::Enter => match app.album_table_context {
             AlbumTableContext::Full => {
                 if let Some(selected_album) = app.selected_album_full.clone() {
@@ -74,7 +74,7 @@ pub async fn handler(key: Key, app: &mut App) {
         },
         //recommended playlist based on selected track
         Key::Char('r') => {
-            handle_recommended_tracks(app).await;
+            handle_recommended_tracks(app);
         }
         _ => {}
     };
@@ -135,7 +135,7 @@ fn handle_low_event(app: &mut App) {
     }
 }
 
-async fn handle_recommended_tracks(app: &mut App) {
+fn handle_recommended_tracks(app: &mut App) {
     match app.album_table_context {
         AlbumTableContext::Full => {
             if let Some(albums) = &app.library.clone().saved_albums.get_results(None) {
@@ -149,7 +149,7 @@ async fn handle_recommended_tracks(app: &mut App) {
                         if let Some(id) = &track.id {
                             app.recommendations_context = Some(RecommendationsContext::Song);
                             app.recommendations_seed = track.name.clone();
-                            app.get_recommendations_for_trackid(&id).await;
+                            app.get_recommendations_for_track_id(id.to_string());
                         }
                     }
                 }
@@ -165,7 +165,7 @@ async fn handle_recommended_tracks(app: &mut App) {
                     if let Some(id) = &track.id {
                         app.recommendations_context = Some(RecommendationsContext::Song);
                         app.recommendations_seed = track.name.clone();
-                        app.get_recommendations_for_trackid(&id).await;
+                        app.get_recommendations_for_track_id(id.to_string());
                     }
                 }
             };
@@ -173,7 +173,7 @@ async fn handle_recommended_tracks(app: &mut App) {
     }
 }
 
-async fn handle_save_event(app: &mut App) {
+fn handle_save_event(app: &mut App) {
     match app.album_table_context {
         AlbumTableContext::Full => {
             if let Some(selected_album) = app.selected_album_full.clone() {
@@ -184,7 +184,7 @@ async fn handle_save_event(app: &mut App) {
                     .get(app.saved_album_tracks_index)
                 {
                     if let Some(track_id) = &selected_track.id {
-                        app.toggle_save_track(track_id.clone()).await;
+                        app.dispatch(IoEvent::ToggleSaveTrack(track_id.to_string()));
                     };
                 };
             };
@@ -197,7 +197,7 @@ async fn handle_save_event(app: &mut App) {
                     .get(selected_album_simplified.selected_index)
                 {
                     if let Some(track_id) = &selected_track.id {
-                        app.toggle_save_track(track_id.clone()).await;
+                        app.dispatch(IoEvent::ToggleSaveTrack(track_id.to_string()));
                     };
                 };
             };
@@ -211,24 +211,24 @@ mod tests {
     use crate::app::ActiveBlock;
 
     #[tokio::test]
-    async fn on_left_press() {
+    fn on_left_press() {
         let mut app = App::new();
         app.set_current_route_state(
             Some(ActiveBlock::AlbumTracks),
             Some(ActiveBlock::AlbumTracks),
         );
 
-        handler(Key::Left, &mut app).await;
+        handler(Key::Left, &mut app);
         let current_route = app.get_current_route();
         assert_eq!(current_route.active_block, ActiveBlock::Empty);
         assert_eq!(current_route.hovered_block, ActiveBlock::Library);
     }
 
     #[tokio::test]
-    async fn on_esc() {
+    fn on_esc() {
         let mut app = App::new();
 
-        handler(Key::Esc, &mut app).await;
+        handler(Key::Esc, &mut app);
 
         let current_route = app.get_current_route();
         assert_eq!(current_route.active_block, ActiveBlock::Empty);

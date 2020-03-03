@@ -3,7 +3,7 @@ use crate::app::{App, ArtistBlock, RecommendationsContext, TrackTableContext};
 use crate::event::Key;
 use crate::network::IoEvent;
 
-async fn handle_down_press_on_selected_block(app: &mut App) {
+fn handle_down_press_on_selected_block(app: &mut App) {
     if let Some(artist) = &mut app.artist {
         match artist.artist_selected_block {
             ArtistBlock::TopTracks => {
@@ -156,7 +156,7 @@ fn handle_low_press_on_selected_block(app: &mut App) {
     }
 }
 
-async fn handle_recommend_event_on_selected_block(app: &mut App) {
+fn handle_recommend_event_on_selected_block(app: &mut App) {
     //recommendations.
     if let Some(artist) = &mut app.artist.clone() {
         match artist.artist_selected_block {
@@ -169,8 +169,7 @@ async fn handle_recommend_event_on_selected_block(app: &mut App) {
                     };
                     app.recommendations_context = Some(RecommendationsContext::Song);
                     app.recommendations_seed = track.name.clone();
-                    app.get_recommendations_for_seed(None, track_id_list, Some(track))
-                        .await;
+                    app.get_recommendations_for_seed(None, track_id_list, Some(track.clone()));
                 }
             }
             ArtistBlock::RelatedArtists => {
@@ -181,15 +180,14 @@ async fn handle_recommend_event_on_selected_block(app: &mut App) {
 
                 app.recommendations_context = Some(RecommendationsContext::Artist);
                 app.recommendations_seed = artist_name.clone();
-                app.get_recommendations_for_seed(artist_id_list, None, None)
-                    .await;
+                app.get_recommendations_for_seed(artist_id_list, None, None);
             }
             _ => {}
         }
     }
 }
 
-async fn handle_enter_event_on_selected_block(app: &mut App) {
+fn handle_enter_event_on_selected_block(app: &mut App) {
     if let Some(artist) = &mut app.artist.clone() {
         match artist.artist_selected_block {
             ArtistBlock::TopTracks => {
@@ -213,21 +211,21 @@ async fn handle_enter_event_on_selected_block(app: &mut App) {
                     .cloned()
                 {
                     app.track_table.context = Some(TrackTableContext::AlbumSearch);
-                    app.get_album_tracks(selected_album).await;
+                    app.dispatch(IoEvent::GetAlbumTracks(selected_album));
                 }
             }
             ArtistBlock::RelatedArtists => {
                 let selected_index = artist.selected_related_artist_index;
-                let artist_id = &artist.related_artists[selected_index].id;
-                let artist_name = &artist.related_artists[selected_index].name;
-                app.get_artist(&artist_id, &artist_name).await;
+                let artist_id = artist.related_artists[selected_index].id.clone();
+                let artist_name = artist.related_artists[selected_index].name.clone();
+                app.get_artist(artist_id, artist_name);
             }
             ArtistBlock::Empty => {}
         }
     }
 }
 
-async fn handle_enter_event_on_hovered_block(app: &mut App) {
+fn handle_enter_event_on_hovered_block(app: &mut App) {
     if let Some(artist) = &mut app.artist {
         match artist.artist_hovered_block {
             ArtistBlock::TopTracks => artist.artist_selected_block = ArtistBlock::TopTracks,
@@ -240,7 +238,7 @@ async fn handle_enter_event_on_hovered_block(app: &mut App) {
     }
 }
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     if let Some(artist) = &mut app.artist {
         match key {
             Key::Esc => {
@@ -248,7 +246,7 @@ pub async fn handler(key: Key, app: &mut App) {
             }
             k if common_key_events::down_event(k) => {
                 if artist.artist_selected_block != ArtistBlock::Empty {
-                    handle_down_press_on_selected_block(app).await;
+                    handle_down_press_on_selected_block(app);
                 } else {
                     handle_down_press_on_hovered_block(app);
                 }
@@ -294,14 +292,14 @@ pub async fn handler(key: Key, app: &mut App) {
             }
             Key::Enter => {
                 if artist.artist_selected_block != ArtistBlock::Empty {
-                    handle_enter_event_on_selected_block(app).await;
+                    handle_enter_event_on_selected_block(app);
                 } else {
-                    handle_enter_event_on_hovered_block(app).await;
+                    handle_enter_event_on_hovered_block(app);
                 }
             }
             Key::Char('r') => {
                 if artist.artist_selected_block != ArtistBlock::Empty {
-                    handle_recommend_event_on_selected_block(app).await;
+                    handle_recommend_event_on_selected_block(app);
                 }
             }
             _ => {}
@@ -314,11 +312,11 @@ mod tests {
     use super::*;
     use crate::app::ActiveBlock;
 
-    #[tokio::test]
-    async fn on_esc() {
+    #[test]
+    fn on_esc() {
         let mut app = App::new();
 
-        handler(Key::Esc, &mut app).await;
+        handler(Key::Esc, &mut app);
 
         let current_route = app.get_current_route();
         assert_eq!(current_route.active_block, ActiveBlock::Empty);

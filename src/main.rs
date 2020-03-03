@@ -199,12 +199,7 @@ async fn main() -> Result<(), failure::Error> {
             let (sync_io_tx, sync_io_rx) = std::sync::mpsc::channel::<IoEvent>();
 
             // Initialise app state
-            let app = Arc::new(Mutex::new(App::new(
-                sync_io_tx,
-                user_config,
-                // TODO: remove client config from app and keep only in network
-                client_config.clone(),
-            )));
+            let app = Arc::new(Mutex::new(App::new(sync_io_tx, user_config)));
             let (spotify, token_expiry) = get_spotify(token_info);
 
             let cloned_app = Arc::clone(&app);
@@ -305,7 +300,7 @@ async fn main() -> Result<(), failure::Error> {
                         // To avoid swallowing the global key presses `q` and `-` make a special
                         // case for the input handler
                         if current_active_block == ActiveBlock::Input {
-                            handlers::input_handler(key, &mut app).await;
+                            handlers::input_handler(key, &mut app);
                         } else if key == app.user_config.keys.back {
                             if app.get_current_route().active_block != ActiveBlock::Input {
                                 // Go back through navigation stack when not in search input mode and exit the app if there are no more places to back to
@@ -322,11 +317,11 @@ async fn main() -> Result<(), failure::Error> {
                                 }
                             }
                         } else {
-                            handlers::handle_app(key, &mut app).await;
+                            handlers::handle_app(key, &mut app);
                         }
                     }
                     event::Event::Tick => {
-                        app.update_on_tick().await;
+                        app.update_on_tick();
                     }
                 }
 
@@ -334,14 +329,11 @@ async fn main() -> Result<(), failure::Error> {
                 // startup speed
                 if is_first_render {
                     app.dispatch(IoEvent::GetPlaylists);
-
+                    app.dispatch(IoEvent::GetUser);
                     app.dispatch(IoEvent::GetCurrentPlayback);
+
                     app.help_docs_size = ui::help::get_help_docs().len() as u32;
 
-                    // If there is no cached device id, send the user to device view
-                    if app.client_config.device_id.is_none() {
-                        app.dispatch(IoEvent::GetDevices);
-                    }
                     is_first_render = false;
                 }
             }

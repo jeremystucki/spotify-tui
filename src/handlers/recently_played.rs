@@ -1,7 +1,7 @@
 use super::{super::app::App, common_key_events};
 use crate::{app::RecommendationsContext, event::Key, network::IoEvent};
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         k if common_key_events::left_event(k) => common_key_events::handle_left_event(app),
         k if common_key_events::down_event(k) => {
@@ -48,7 +48,7 @@ pub async fn handler(key: Key, app: &mut App) {
                     recently_played_result.items.get(app.recently_played.index)
                 {
                     if let Some(track_id) = &selected_track.track.id {
-                        app.toggle_save_track(track_id.clone()).await;
+                        app.dispatch(IoEvent::ToggleSaveTrack(track_id.to_string()));
                     };
                 };
             };
@@ -77,7 +77,7 @@ pub async fn handler(key: Key, app: &mut App) {
                     if let Some(id) = &item.track.id {
                         app.recommendations_context = Some(RecommendationsContext::Song);
                         app.recommendations_seed = item.track.name.clone();
-                        app.get_recommendations_for_trackid(&id).await;
+                        app.get_recommendations_for_track_id(id.to_string());
                     }
                 }
             }
@@ -90,25 +90,25 @@ pub async fn handler(key: Key, app: &mut App) {
 mod tests {
     use super::{super::super::app::ActiveBlock, *};
 
-    #[tokio::test]
-    async fn on_left_press() {
+    #[test]
+    fn on_left_press() {
         let mut app = App::new();
         app.set_current_route_state(
             Some(ActiveBlock::AlbumTracks),
             Some(ActiveBlock::AlbumTracks),
         );
 
-        handler(Key::Left, &mut app).await;
+        handler(Key::Left, &mut app);
         let current_route = app.get_current_route();
         assert_eq!(current_route.active_block, ActiveBlock::Empty);
         assert_eq!(current_route.hovered_block, ActiveBlock::Library);
     }
 
-    #[tokio::test]
-    async fn on_esc() {
+    #[test]
+    fn on_esc() {
         let mut app = App::new();
 
-        handler(Key::Esc, &mut app).await;
+        handler(Key::Esc, &mut app);
 
         let current_route = app.get_current_route();
         assert_eq!(current_route.active_block, ActiveBlock::Empty);

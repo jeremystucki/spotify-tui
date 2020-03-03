@@ -5,7 +5,7 @@ use super::{
 use crate::event::Key;
 use crate::network::IoEvent;
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         k if common_key_events::right_event(k) => common_key_events::handle_right_event(app),
         k if common_key_events::down_event(k) => {
@@ -76,17 +76,7 @@ pub async fn handler(key: Key, app: &mut App) {
             };
         }
         Key::Char('D') => {
-            app.user_unfollow_playlists().await;
-            if let Some(spotify) = &app.spotify {
-                let playlists = spotify
-                    .current_user_playlists(app.large_search_limit, None)
-                    .await;
-
-                match playlists {
-                    Ok(p) => app.playlists = Some(p),
-                    Err(e) => app.handle_error(e),
-                };
-            }
+            app.user_unfollow_playlist();
         }
         _ => {}
     }

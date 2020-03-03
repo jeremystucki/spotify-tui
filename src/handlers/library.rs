@@ -5,7 +5,7 @@ use super::{
 use crate::event::Key;
 use crate::network::IoEvent;
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         k if common_key_events::right_event(k) => common_key_events::handle_right_event(app),
         k if common_key_events::down_event(k) => {
@@ -39,41 +39,12 @@ pub async fn handler(key: Key, app: &mut App) {
         Key::Enter => match app.library.selected_index {
             // Made For You,
             0 => {
-                app.get_made_for_you().await;
+                app.get_made_for_you();
                 app.push_navigation_stack(RouteId::MadeForYou, ActiveBlock::MadeForYou);
             }
             // Recently Played,
             1 => {
-                if let Some(spotify) = &app.spotify {
-                    match spotify
-                        // Seems I need to clone here becuase `current_user_recently_played`
-                        // consumes `self`?
-                        .clone()
-                        .current_user_recently_played(app.large_search_limit)
-                        .await
-                    {
-                        Ok(result) => {
-                            app.recently_played.result = Some(result.clone());
-
-                            app.current_user_saved_tracks_contains(
-                                result
-                                    .items
-                                    .iter()
-                                    .filter_map(|item| item.track.id.clone())
-                                    .collect::<Vec<String>>(),
-                            )
-                            .await;
-
-                            app.push_navigation_stack(
-                                RouteId::RecentlyPlayed,
-                                ActiveBlock::RecentlyPlayed,
-                            );
-                        }
-                        Err(e) => {
-                            app.handle_error(e);
-                        }
-                    }
-                };
+                app.dispatch(IoEvent::GetRecentlyPlayed);
             }
             // Liked Songs,
             2 => {
@@ -81,12 +52,12 @@ pub async fn handler(key: Key, app: &mut App) {
             }
             // Albums,
             3 => {
-                app.get_current_user_saved_albums(Some(0)).await;
+                app.dispatch(IoEvent::GetCurrentUserSavedAlbums(Some(0)));
                 app.push_navigation_stack(RouteId::AlbumList, ActiveBlock::AlbumList);
             }
             //  Artists,
             4 => {
-                app.get_artists(None).await;
+                app.dispatch(IoEvent::GetFollowedArtists(None));
                 app.push_navigation_stack(RouteId::Artists, ActiveBlock::Artists);
             }
             // Podcasts,

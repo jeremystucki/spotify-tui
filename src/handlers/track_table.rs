@@ -5,7 +5,7 @@ use super::{
 use crate::event::Key;
 use crate::network::IoEvent;
 
-pub async fn handler(key: Key, app: &mut App) {
+pub fn handler(key: Key, app: &mut App) {
     match key {
         k if common_key_events::left_event(k) => common_key_events::handle_left_event(app),
         k if common_key_events::down_event(k) => {
@@ -35,7 +35,7 @@ pub async fn handler(key: Key, app: &mut App) {
             app.track_table.selected_index = next_index;
         }
         Key::Enter => {
-            on_enter(app).await;
+            on_enter(app);
         }
         // Scroll down
         Key::Ctrl('d') => {
@@ -65,7 +65,7 @@ pub async fn handler(key: Key, app: &mut App) {
                     }
                     TrackTableContext::RecommendedTracks => {}
                     TrackTableContext::SavedTracks => {
-                        app.get_current_user_saved_tracks_next().await;
+                        app.get_current_user_saved_tracks_next();
                     }
                     TrackTableContext::AlbumSearch => {}
                     TrackTableContext::PlaylistSearch => {}
@@ -121,7 +121,7 @@ pub async fn handler(key: Key, app: &mut App) {
                     }
                     TrackTableContext::RecommendedTracks => {}
                     TrackTableContext::SavedTracks => {
-                        app.get_current_user_saved_tracks_previous().await;
+                        app.get_current_user_saved_tracks_previous();
                     }
                     TrackTableContext::AlbumSearch => {}
                     TrackTableContext::PlaylistSearch => {}
@@ -150,17 +150,17 @@ pub async fn handler(key: Key, app: &mut App) {
                 None => {}
             };
         }
-        Key::Ctrl('e') => jump_to_end(app).await,
-        Key::Ctrl('a') => jump_to_start(app).await,
+        Key::Ctrl('e') => jump_to_end(app),
+        Key::Ctrl('a') => jump_to_start(app),
         //recommended song radio
         Key::Char('r') => {
-            handle_recommended_tracks(app).await;
+            handle_recommended_tracks(app);
         }
         _ => {}
     }
 }
 
-async fn handle_recommended_tracks(app: &mut App) {
+fn handle_recommended_tracks(app: &mut App) {
     let (selected_index, tracks) = (&app.track_table.selected_index, &app.track_table.tracks);
     if let Some(track) = tracks.get(*selected_index) {
         let first_track = track.clone();
@@ -170,12 +170,11 @@ async fn handle_recommended_tracks(app: &mut App) {
         };
         app.recommendations_context = Some(RecommendationsContext::Song);
         app.recommendations_seed = first_track.name.clone();
-        app.get_recommendations_for_seed(None, track_id_list, Some(&first_track))
-            .await;
+        app.get_recommendations_for_seed(None, track_id_list, Some(first_track));
     };
 }
 
-async fn jump_to_end(app: &mut App) {
+fn jump_to_end(app: &mut App) {
     match &app.track_table.context {
         Some(context) => match context {
             TrackTableContext::MyPlaylists => {
@@ -214,7 +213,7 @@ async fn jump_to_end(app: &mut App) {
     }
 }
 
-async fn on_enter(app: &mut App) {
+fn on_enter(app: &mut App) {
     let TrackTable {
         context,
         selected_index,
@@ -245,10 +244,16 @@ async fn on_enter(app: &mut App) {
                 };
             }
             TrackTableContext::RecommendedTracks => {
-                if let Some(_track) = tracks.get(*selected_index) {
-                    app.start_recommendations_playback(Some(app.track_table.selected_index))
-                        .await;
-                };
+                app.dispatch(IoEvent::StartPlayback(
+                    None,
+                    Some(
+                        app.recommended_tracks
+                            .iter()
+                            .map(|x| x.uri.clone())
+                            .collect::<Vec<String>>(),
+                    ),
+                    Some(app.track_table.selected_index),
+                ));
             }
             TrackTableContext::SavedTracks => {
                 if let Some(saved_tracks) = &app.library.saved_tracks.get_results(None) {
@@ -324,7 +329,7 @@ async fn on_enter(app: &mut App) {
     };
 }
 
-async fn jump_to_start(app: &mut App) {
+fn jump_to_start(app: &mut App) {
     match &app.track_table.context {
         Some(context) => match context {
             TrackTableContext::MyPlaylists => {
