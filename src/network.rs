@@ -308,9 +308,9 @@ impl Network {
     async fn current_user_saved_tracks_contains(&self, app: &AppArc, ids: Vec<String>) {
         match self.spotify.current_user_saved_tracks_contains(&ids).await {
             Ok(is_saved_vec) => {
+                let mut app = app.lock().await;
                 for (i, id) in ids.iter().enumerate() {
                     if let Some(is_liked) = is_saved_vec.get(i) {
-                        let mut app = app.lock().await;
                         if *is_liked {
                             app.liked_song_ids_set.insert(id.to_string());
                         } else {

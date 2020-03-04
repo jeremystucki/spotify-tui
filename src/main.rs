@@ -351,7 +351,6 @@ async fn start_tokio<'a>(
     app: &Arc<Mutex<App>>,
     network: Network,
 ) {
-    let io_rx = io_rx;
     while let Ok(io_event) = io_rx.recv() {
         let app = Arc::clone(app);
         let mut network = network.clone();
